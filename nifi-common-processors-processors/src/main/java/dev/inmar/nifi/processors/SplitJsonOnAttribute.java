@@ -76,6 +76,13 @@ public class SplitJsonOnAttribute extends AbstractProcessor {
             .addValidator(StandardValidators.DATA_SIZE_VALIDATOR)
             .build();
 
+    public static final PropertyDescriptor SPLIT_ATTRIBUTE_NAME = new PropertyDescriptor.Builder()
+            .name("Split attribute name")
+            .description("Attribute name for split value.")
+            .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
+            .required(true)
+            .build();
+
 
     public static final Relationship REL_SUCCESS = new Relationship.Builder()
             .name("success")
@@ -96,7 +103,12 @@ public class SplitJsonOnAttribute extends AbstractProcessor {
 
     @Override
     protected void init(final ProcessorInitializationContext context) {
-        descriptors = List.of(ARRAY_JSON_PATH_EXPRESSION, MAX_STRING_LENGTH);
+        descriptors = List.of(
+                ARRAY_JSON_PATH_EXPRESSION,
+                NULL_VALUE_DEFAULT_REPRESENTATION,
+                MAX_STRING_LENGTH,
+                SPLIT_ATTRIBUTE_NAME
+        );
         relationships = Set.of(REL_SUCCESS, REL_FAILURE);
     }
 
@@ -121,7 +133,10 @@ public class SplitJsonOnAttribute extends AbstractProcessor {
     @Override
     public void onTrigger(final ProcessContext context, final ProcessSession session) {
         FlowFile original = session.get();
-        if (original == null) return;
+        if (original == null) {
+            return;
+        }
+        final String splitAttributeName = context.getProperty(SPLIT_ATTRIBUTE_NAME).getValue();
         final ComponentLog logger = getLogger();
         DocumentContext documentContext;
         try {
@@ -140,7 +155,7 @@ public class SplitJsonOnAttribute extends AbstractProcessor {
             session.transfer(original, REL_FAILURE);
             return;
         }
-        if (!(jsonPathResult instanceof List)) {
+        if (!(jsonPathResult instanceof List<?> resultList)) {
             logger.error(
                     "The evaluated value {} of {} was not a JSON Array compatible type and cannot be split.",
                     jsonPathResult,
@@ -150,18 +165,17 @@ public class SplitJsonOnAttribute extends AbstractProcessor {
             return;
         }
 
-        List resultList = (List) jsonPathResult;
-        Map<String, String> attributes = new HashMap<>();
-        for (int i = 0; i < resultList.size(); i++) {
-            Object resultSegment = resultList.get(i);
+        for (Object resultSegment : resultList) {
             FlowFile split = session.clone(original);
             String resultSegmentContent = getResultRepresentation(
                     jsonPathConfiguration.jsonProvider(),
                     resultSegment,
                     nullDefaultValue
             );
-            session.transfer(session.putAllAttributes(split, attributes), REL_SUCCESS);
+            split = session.putAttribute(split, splitAttributeName, resultSegmentContent);
+            session.transfer(split, REL_SUCCESS);
         }
+        session.remove(original);
         logger.info("Split {} into {} FlowFiles", original, resultList.size());
     }
 

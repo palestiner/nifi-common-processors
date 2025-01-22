@@ -6,8 +6,8 @@
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
-        <module name="nifi-nifi-common-processors-nar" />
-        <module name="nifi-nifi-common-processors-processors" />
+        <module name="nifi-common-processors-processors" />
+        <module name="nifi-common-processors-nar" />
       </profile>
     </annotationProcessing>
   </component>

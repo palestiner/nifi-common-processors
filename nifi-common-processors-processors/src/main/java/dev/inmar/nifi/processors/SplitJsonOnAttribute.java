@@ -35,7 +35,6 @@ import org.apache.nifi.logging.ComponentLog;
 import org.apache.nifi.processor.*;
 import org.apache.nifi.processor.util.StandardValidators;
 
-import java.io.BufferedInputStream;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -78,7 +77,14 @@ public class SplitJsonOnAttribute extends AbstractProcessor {
 
     public static final PropertyDescriptor SPLIT_ATTRIBUTE_NAME = new PropertyDescriptor.Builder()
             .name("Split attribute name")
-            .description("Attribute name for split value.")
+            .description("Attribute name for split.")
+            .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
+            .required(true)
+            .build();
+
+    public static final PropertyDescriptor SPLIT_RESULT_ATTRIBUTE_NAME = new PropertyDescriptor.Builder()
+            .name("Split result attribute name")
+            .description("Attribute name for split result value.")
             .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
             .required(true)
             .build();
@@ -107,7 +113,8 @@ public class SplitJsonOnAttribute extends AbstractProcessor {
                 ARRAY_JSON_PATH_EXPRESSION,
                 NULL_VALUE_DEFAULT_REPRESENTATION,
                 MAX_STRING_LENGTH,
-                SPLIT_ATTRIBUTE_NAME
+                SPLIT_ATTRIBUTE_NAME,
+                SPLIT_RESULT_ATTRIBUTE_NAME
         );
         relationships = Set.of(REL_SUCCESS, REL_FAILURE);
     }
@@ -124,8 +131,9 @@ public class SplitJsonOnAttribute extends AbstractProcessor {
 
     @OnScheduled
     public void onScheduled(ProcessContext processContext) {
-        nullDefaultValue = NULL_REPRESENTATION_MAP.get(processContext.getProperty(NULL_VALUE_DEFAULT_REPRESENTATION)
-                                                               .getValue());
+        nullDefaultValue = NULL_REPRESENTATION_MAP.get(
+                processContext.getProperty(NULL_VALUE_DEFAULT_REPRESENTATION).getValue()
+        );
         final int maxStringLength = processContext.getProperty(MAX_STRING_LENGTH).asDataSize(DataUnit.B).intValue();
         jsonPathConfiguration = createConfiguration(maxStringLength);
     }
@@ -136,13 +144,20 @@ public class SplitJsonOnAttribute extends AbstractProcessor {
         if (original == null) {
             return;
         }
-        final String splitAttributeName = context.getProperty(SPLIT_ATTRIBUTE_NAME).getValue();
         final ComponentLog logger = getLogger();
+        final String splitAttributeName = context.getProperty(SPLIT_ATTRIBUTE_NAME).getValue();
+        final String splitAttribute = original.getAttribute(splitAttributeName);
+        if (splitAttribute == null) {
+            logger.error("FlowFile {} did not have attribute content by name {}.", original, splitAttributeName);
+            session.transfer(original, REL_FAILURE);
+            return;
+        }
+        final String splitResultAttributeName = context.getProperty(SPLIT_RESULT_ATTRIBUTE_NAME).getValue();
         DocumentContext documentContext;
         try {
-            documentContext = validateAndEstablishJsonContext(session, original, jsonPathConfiguration);
+            documentContext = validateAndEstablishJsonContext(splitAttribute, jsonPathConfiguration);
         } catch (InvalidJsonException e) {
-            logger.error("FlowFile {} did not have valid JSON content.", original);
+            logger.error("FlowFile {} did not have valid JSON content in attribute {}.", original, splitAttributeName);
             session.transfer(original, REL_FAILURE);
             return;
         }
@@ -151,7 +166,7 @@ public class SplitJsonOnAttribute extends AbstractProcessor {
         try {
             jsonPathResult = documentContext.read(jsonPath);
         } catch (PathNotFoundException e) {
-            logger.warn("JsonPath {} could not be found for FlowFile {}", jsonPath.getPath(), original);
+            logger.warn("JsonPath {} could not be found for FlowFile {} attribute {}", jsonPath.getPath(), original, splitAttributeName);
             session.transfer(original, REL_FAILURE);
             return;
         }
@@ -172,11 +187,11 @@ public class SplitJsonOnAttribute extends AbstractProcessor {
                     resultSegment,
                     nullDefaultValue
             );
-            split = session.putAttribute(split, splitAttributeName, resultSegmentContent);
+            split = session.putAttribute(split, splitResultAttributeName, resultSegmentContent);
             session.transfer(split, REL_SUCCESS);
         }
         session.remove(original);
-        logger.info("Split {} into {} FlowFiles", original, resultList.size());
+        logger.info("Split {} into {} FlowFiles by attribute {}", original, resultList.size(), splitAttributeName);
     }
 
     @Override
@@ -213,22 +228,14 @@ public class SplitJsonOnAttribute extends AbstractProcessor {
 
 
     private DocumentContext validateAndEstablishJsonContext(
-            ProcessSession processSession,
-            FlowFile flowFile,
+            String jsonAttributeValue,
             Configuration jsonPathConfiguration
     ) {
-        final AtomicReference<DocumentContext> contextHolder = new AtomicReference<>(null);
-        processSession.read(
-                flowFile, in -> {
-                    try (BufferedInputStream bufferedInputStream = new BufferedInputStream(in)) {
-                        DocumentContext ctx = JsonPath.using(jsonPathConfiguration).parse(bufferedInputStream);
-                        contextHolder.set(ctx);
-                    } catch (IllegalArgumentException iae) {
-                        throw new InvalidJsonException(iae);
-                    }
-                }
-        );
-        return contextHolder.get();
+        try {
+            return JsonPath.using(jsonPathConfiguration).parse(jsonAttributeValue);
+        } catch (IllegalArgumentException iae) {
+            throw new InvalidJsonException(iae);
+        }
     }
 
     private Configuration createConfiguration(final int maxStringLength) {

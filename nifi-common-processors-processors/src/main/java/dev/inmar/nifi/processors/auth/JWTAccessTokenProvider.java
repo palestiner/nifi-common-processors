@@ -181,9 +181,9 @@ public class JWTAccessTokenProvider extends AbstractControllerService implements
             final Response response = httpClient.newCall(newRequest).execute();
             final String responseBody = response.body().string();
             if (response.isSuccessful()) {
-                getLogger().debug("Nifi auth Access Token retrieved [HTTP {}]", response.code());
+                getLogger().debug("Access Token retrieved [HTTP {}]", response.code());
                 if (responseBody.isEmpty()) {
-                    throw new ProcessException("Nifi auth access token response is empty!");
+                    throw new ProcessException("Access token response is empty!");
                 }
                 String[] chunks = responseBody.split("\\.");
                 Base64.Decoder decoder = Base64.getUrlDecoder();
@@ -195,17 +195,17 @@ public class JWTAccessTokenProvider extends AbstractControllerService implements
                 return accessToken;
             } else {
                 getLogger().error(String.format(
-                        "Nifi auth access token request failed [HTTP %d], response:%n%s",
+                        "Access token request failed [HTTP %d], response:%n%s",
                         response.code(),
                         responseBody
                 ));
                 throw new ProcessException(String.format(
-                        "Nifi auth access token request failed [HTTP %d]",
+                        "Access token request failed [HTTP %d]",
                         response.code()
                 ));
             }
         } catch (final IOException e) {
-            throw new UncheckedIOException("Nifi auth access token request failed", e);
+            throw new UncheckedIOException("Access token request failed", e);
         }
     }
 

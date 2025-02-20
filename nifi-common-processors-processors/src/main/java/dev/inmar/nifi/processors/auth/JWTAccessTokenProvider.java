@@ -27,6 +27,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.time.Instant;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 @Tags({"jwt", "provider", "authorization", "access token", "http"})
@@ -88,13 +89,13 @@ public class JWTAccessTokenProvider extends AbstractControllerService implements
     public static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
-    private volatile String serverUrl;
+    // if server url has calculated host (for example hostname(bool) el function) you need get jwt token for calculated host
+    private static final Map<String, AccessToken> SERVER_URL_ACCESS_TOKENS = new ConcurrentHashMap<>();
+
     private volatile OkHttpClient httpClient;
     private volatile String username;
     private volatile String password;
     private volatile long refreshWindowSeconds;
-
-    private volatile AccessToken accessDetails;
 
     @Override
     public List<PropertyDescriptor> getSupportedPropertyDescriptors() {
@@ -103,12 +104,12 @@ public class JWTAccessTokenProvider extends AbstractControllerService implements
 
     @OnEnabled
     public void onEnabled(ConfigurationContext context) {
-        getProperties(context);
+        initProperties(context);
     }
 
     @OnDisabled
     public void onDisabled() {
-        accessDetails = null;
+        SERVER_URL_ACCESS_TOKENS.clear();
     }
 
     protected OkHttpClient createHttpClient(ConfigurationContext context) {
@@ -127,17 +128,19 @@ public class JWTAccessTokenProvider extends AbstractControllerService implements
 
     @Override
     public AccessToken getAccessDetails() {
-        if (this.accessDetails == null || isRefreshRequired()) {
-            acquireAccessDetails();
-        }
-        return accessDetails;
-    }
-
-    private void getProperties(ConfigurationContext context) {
-        serverUrl = context.getProperty(SERVER_URL)
+        final String currentServerUrl = getConfigurationContext().getProperty(SERVER_URL)
                 .evaluateAttributeExpressions()
                 .getValue();
+        final AccessToken serverUrlAccessToken = SERVER_URL_ACCESS_TOKENS.get(currentServerUrl);
+        if (serverUrlAccessToken == null || isRefreshRequired(serverUrlAccessToken)) {
+            final AccessToken accessToken = acquireAccessDetails(currentServerUrl);
+            SERVER_URL_ACCESS_TOKENS.put(currentServerUrl, accessToken);
+            return accessToken;
+        }
+        return serverUrlAccessToken;
+    }
 
+    private void initProperties(ConfigurationContext context) {
         httpClient = createHttpClient(context);
 
         username = context.getProperty(USERNAME).evaluateAttributeExpressions().getValue();
@@ -146,29 +149,29 @@ public class JWTAccessTokenProvider extends AbstractControllerService implements
         refreshWindowSeconds = context.getProperty(REFRESH_WINDOW).asTimePeriod(TimeUnit.SECONDS);
     }
 
-    private boolean isRefreshRequired() {
+    private boolean isRefreshRequired(AccessToken accessToken) {
         final Instant expirationRefreshTime =
-                Instant.ofEpochSecond(accessDetails.getExpiresIn())
+                Instant.ofEpochSecond(accessToken.getExpiresIn())
                         .minusSeconds(refreshWindowSeconds);
 
         return Instant.now().isAfter(expirationRefreshTime);
     }
 
-    private void acquireAccessDetails() {
-        getLogger().debug("New Access Token request started [{}]", serverUrl);
+    private AccessToken acquireAccessDetails(String currentServerUrl) {
+        getLogger().debug("New Access Token request started [{}]", currentServerUrl);
 
         FormBody.Builder acquireTokenBuilder = new FormBody.Builder()
                 .add("username", username)
                 .add("password", password);
 
-        this.accessDetails = requestToken(acquireTokenBuilder);
+        return requestToken(currentServerUrl, acquireTokenBuilder);
     }
 
-    private AccessToken requestToken(FormBody.Builder formBuilder) {
+    private AccessToken requestToken(String currentServerUrl, FormBody.Builder formBuilder) {
         RequestBody requestBody = formBuilder.build();
 
         Request.Builder requestBuilder = new Request.Builder()
-                .url(serverUrl)
+                .url(currentServerUrl)
                 .post(requestBody);
 
         Request request = requestBuilder.build();
@@ -215,7 +218,7 @@ public class JWTAccessTokenProvider extends AbstractControllerService implements
             ComponentLog verificationLogger,
             Map<String, String> variables
     ) {
-        getProperties(context);
+        initProperties(context);
 
         ConfigVerificationResult.Builder builder = new ConfigVerificationResult.Builder()
                 .verificationStepName("Can acquire token");
@@ -228,7 +231,7 @@ public class JWTAccessTokenProvider extends AbstractControllerService implements
                     .explanation(ex.getMessage());
         }
 
-        return Arrays.asList(builder.build());
+        return List.of(builder.build());
     }
 
 }

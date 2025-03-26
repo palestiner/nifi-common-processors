@@ -6,8 +6,13 @@
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
-        <module name="nifi-common-processors-processors" />
-        <module name="nifi-common-processors-nar" />
+        <module name="nifi-inmar-common-processors" />
+        <module name="nifi-inmar-sftp-processors" />
+        <module name="nifi-inmar-common-processors-nar" />
+        <module name="nifi-inmar-smb-processors-nar" />
+        <module name="nifi-inmar-sftp-processors-nar" />
+        <module name="nifi-inmar-processors-util" />
+        <module name="nifi-inmar-smb-processors" />
       </profile>
     </annotationProcessing>
   </component>

@@ -19,23 +19,28 @@
 
     <parent>
         <groupId>org.apache.nifi</groupId>
-        <artifactId>nifi-extension-bundles</artifactId>
+        <artifactId>nifi-standard-shared-bom</artifactId>
         <version>2.0.0</version>
     </parent>
 
     <groupId>dev.inmar</groupId>
-    <artifactId>nifi-common-processors</artifactId>
-    <version>2.0.8</version>
+    <artifactId>nifi-inmar-processors-bundle</artifactId>
+    <version>2.0.9</version>
     <packaging>pom</packaging>
 
     <properties>
         <nifi.version>2.0.0</nifi.version>
-        <jjwt-api.version>0.12.6</jjwt-api.version>
+        <commons-collections4.version>4.4</commons-collections4.version>
     </properties>
 
     <modules>
-        <module>nifi-common-processors-processors</module>
-        <module>nifi-common-processors-nar</module>
+        <module>nifi-inmar-processors-util</module>
+        <module>nifi-inmar-common-processors</module>
+        <module>nifi-inmar-common-processors-nar</module>
+        <module>nifi-inmar-smb-processors</module>
+        <module>nifi-inmar-smb-processors-nar</module>
+        <module>nifi-inmar-sftp-processors</module>
+        <module>nifi-inmar-sftp-processors-nar</module>
     </modules>
 
     <dependencyManagement>
@@ -44,8 +49,32 @@
 
             <dependency>
                 <groupId>dev.inmar</groupId>
-                <artifactId>nifi-common-processors-processors</artifactId>
+                <artifactId>nifi-inmar-processors-util</artifactId>
                 <version>${project.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>dev.inmar</groupId>
+                <artifactId>nifi-inmar-common-processors</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>dev.inmar</groupId>
+                <artifactId>nifi-inmar-sftp-processors</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>dev.inmar</groupId>
+                <artifactId>nifi-inmar-smb-processors</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.apache.commons</groupId>
+                <artifactId>commons-collections4</artifactId>
+                <version>${commons-collections4.version}</version>
             </dependency>
 
             <dependency>
@@ -68,7 +97,39 @@
 
             <dependency>
                 <groupId>org.apache.nifi</groupId>
-                <artifactId>nifi-standard-services-api-nar</artifactId>
+                <artifactId>nifi-smb-processors</artifactId>
+                <version>${nifi.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.apache.nifi</groupId>
+                <artifactId>nifi-smb-client-api</artifactId>
+                <version>${nifi.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.apache.nifi</groupId>
+                <artifactId>nifi-standard-processors</artifactId>
+                <version>${nifi.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.apache.nifi</groupId>
+                <artifactId>nifi-standard-shared-nar</artifactId>
+                <version>${nifi.version}</version>
+                <type>nar</type>
+            </dependency>
+
+            <dependency>
+                <groupId>org.apache.nifi</groupId>
+                <artifactId>nifi-standard-nar</artifactId>
+                <version>${nifi.version}</version>
+                <type>nar</type>
+            </dependency>
+
+            <dependency>
+                <groupId>org.apache.nifi</groupId>
+                <artifactId>nifi-smb-nar</artifactId>
                 <version>${nifi.version}</version>
                 <type>nar</type>
             </dependency>

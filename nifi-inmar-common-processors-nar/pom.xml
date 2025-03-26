@@ -18,23 +18,23 @@
 
     <parent>
         <groupId>dev.inmar</groupId>
-        <artifactId>nifi-common-processors</artifactId>
-        <version>2.0.8</version>
+        <artifactId>nifi-inmar-processors-bundle</artifactId>
+        <version>2.0.9</version>
     </parent>
 
-    <artifactId>nifi-common-processors-nar</artifactId>
+    <artifactId>nifi-inmar-common-processors-nar</artifactId>
     <packaging>nar</packaging>
 
     <dependencies>
 
         <dependency>
             <groupId>dev.inmar</groupId>
-            <artifactId>nifi-common-processors-processors</artifactId>
+            <artifactId>nifi-inmar-common-processors</artifactId>
         </dependency>
 
         <dependency>
             <groupId>org.apache.nifi</groupId>
-            <artifactId>nifi-standard-services-api-nar</artifactId>
+            <artifactId>nifi-standard-shared-nar</artifactId>
             <type>nar</type>
         </dependency>
 
